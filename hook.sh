@@ -68,32 +68,27 @@ args=( \
 # This allows use on non-dynamic (dedyn.io) domains.
 minimum_ttl=$(curl "${args[@]}" -X GET "https://desec.io/api/v1/domains/$DEDYN_NAME/" | tr -d '\n' | grep -o '"minimum_ttl"[[:space:]]*:[[:space:]]*[[:digit:]]*' | grep -o '[[:digit:]]*')
 
-# Fetch and parse the current rrset for manipulation below.
-acme_records=$(curl "${args[@]}" -X GET "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/?subname=@&type=TXT" \
-    | tr -d '\n' | grep -o '"records"[[:space:]]*:[[:space:]]*\[[^]]*\]' | grep -o '"\\".*\\""')
-
-if [ -n "$CERTBOT_AUTH_OUTPUT" ]; then
-    # Delete all occurrences of the current _acme-challenge from the rrset. If
-    # nothing remains, publish a blank "records" array to delete the rrset. Else,
-    # republish the remaining challenges.
-    acme_records=$acme_records,
-    acme_records=${acme_records//*([[:space:]])'"\"'"$CERTBOT_VALIDATION"'\""'*([[:space:]])','*([[:space:]])/}
-    [ -n "$acme_records" ] && acme_records=${acme_records:0:-1}
-else
-    # If the current rrset is empty, we simply publish the new challenge. If
-    # the current rrset contains records and we have a new challenge, we append
-    # the new challenge to the current rrset. If for some reason the new
-    # challenge is already in the rrset, we re-publish the current rrset as-is.
-    if [ -z "$acme_records" ]; then
+# If the current rrset is empty, we simply publish the new challenge. If
+# the current rrset contains records and we have a new challenge, we append
+# the new challenge to the current rrset. If for some reason the new
+# challenge is already in the rrset, we re-publish the current rrset as-is.
+if [ -z "$acme_records" ]; then
 	acme_records='"\"'"$CERTBOT_VALIDATION"'\""'
-    elif [[ ! $acme_records =~ "$CERTBOT_VALIDATION" ]]; then
+elif [[ ! $acme_records =~ "$CERTBOT_VALIDATION" ]]; then
 	acme_records+=',"\"'"$CERTBOT_VALIDATION"'\""'
-    fi
 fi
 
 # set ACME challenge (overwrite if possible, create otherwise)
-curl "${args[@]}" -X PUT -o /dev/null "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/@/TXT/" \
-    '-d' '{"type":"TXT", "records":['"$acme_records"'], "ttl":'"$minimum_ttl"'}'
+if [ -n "$CERTBOT_AUTH_OUTPUT" ]; then
+	# Delete everything
+	curl "${args[@]}" -X PUT -o /dev/null "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/@/TXT/" \
+	    '-d' '{"type":"TXT", "records":[], "ttl":'"$minimum_ttl"'}'
+
+else
+	# Create
+	curl "${args[@]}" -X POST -o /dev/null "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/" \
+	    '-d' '{"type":"TXT", "records":['"$acme_records"'], "ttl":'"$minimum_ttl"'}'
+fi
 
 [ -n "$CERTBOT_AUTH_OUTPUT" ] \
 || (echo "Waiting 120s for changes be published."; date; sleep 120)

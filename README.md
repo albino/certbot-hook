@@ -5,3 +5,7 @@
 The original source code can be found [here](https://github.com/desec-utils/certbot-hook).
 
 The original README file can be found in `README.orig`.
+
+## Caveats
+
+This script assumes the zone will be empty when it starts, and empties the zone again when it's finished. Even if this causes it to fail occasionally, it is _probably_ fine, just something to consider.
