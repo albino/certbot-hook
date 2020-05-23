@@ -69,7 +69,7 @@ args=( \
 minimum_ttl=$(curl "${args[@]}" -X GET "https://desec.io/api/v1/domains/$DEDYN_NAME/" | tr -d '\n' | grep -o '"minimum_ttl"[[:space:]]*:[[:space:]]*[[:digit:]]*' | grep -o '[[:digit:]]*')
 
 # Fetch and parse the current rrset for manipulation below.
-acme_records=$(curl "${args[@]}" -X GET "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/?subname=_acme-challenge$infix&type=TXT" \
+acme_records=$(curl "${args[@]}" -X GET "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/?subname=@&type=TXT" \
     | tr -d '\n' | grep -o '"records"[[:space:]]*:[[:space:]]*\[[^]]*\]' | grep -o '"\\".*\\""')
 
 if [ -n "$CERTBOT_AUTH_OUTPUT" ]; then
@@ -92,8 +92,8 @@ else
 fi
 
 # set ACME challenge (overwrite if possible, create otherwise)
-curl "${args[@]}" -X PUT -o /dev/null "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/" \
-    '-d' '[{"subname":"_acme-challenge'"$infix"'", "type":"TXT", "records":['"$acme_records"'], "ttl":'"$minimum_ttl"'}]'
+curl "${args[@]}" -X PUT -o /dev/null "https://desec.io/api/v1/domains/$DEDYN_NAME/rrsets/@/TXT/" \
+    '-d' '{"type":"TXT", "records":['"$acme_records"'], "ttl":'"$minimum_ttl"'}'
 
 [ -n "$CERTBOT_AUTH_OUTPUT" ] \
 || (echo "Waiting 120s for changes be published."; date; sleep 120)
